@@ -67,6 +67,8 @@ export class PullRequestModel {
    * than drowning out the other policies.
    */
   public areReviewerPoliciesOk: boolean | undefined = undefined;
+  /** Whether a blocking, non-reviewer policy was rejected or is broken. */
+  public arePoliciesRejected: boolean = false;
   public hasFailures: boolean = false;
   public labels: WebApiTagDefinition[] = [];
   public lastVisit?: Date;
@@ -254,6 +256,7 @@ export class PullRequestModel {
     IStatusProps
   > = {
     failed: Statuses.Failed,
+    policiesFailed: Statuses.Failed,
     rejected: Statuses.Failed,
     waitingForAuthor: Statuses.Warning,
     draft: Statuses.Queued,
@@ -273,6 +276,7 @@ export class PullRequestModel {
       votes: (reviewers || []).map((r) => r.vote),
       requiredVotes: this.requiredReviewers.map((r) => r.vote),
       nonReviewerPoliciesOk: isAllPoliciesOk,
+      nonReviewerPoliciesFailed: this.arePoliciesRejected,
       reviewerPoliciesOk: this.areReviewerPoliciesOk,
     });
 
@@ -418,17 +422,27 @@ export class PullRequestModel {
       i.configuration.type.id === EvaluationPolicyType.RequiredReviewers;
 
     const reviewerPolicies = blockingPolicies.filter(isReviewerPolicy);
+    const otherPolicies = blockingPolicies.filter(
+      (i) => isReviewerPolicy(i) === false
+    );
 
-    self.isAllPoliciesOk = blockingPolicies
-      .filter((i) => isReviewerPolicy(i) === false)
-      .every((i) => i.status === "approved");
+    // notApplicable counts as satisfied: a policy that does not apply should
+    // not hold a pull request on "waiting" forever.
+    const isSatisfied = (i: AzureGitModels.Value): boolean =>
+      i.status === "approved" || i.status === "notApplicable";
+
+    const hasFailed = (i: AzureGitModels.Value): boolean =>
+      i.status === "rejected" || i.status === "broken";
+
+    self.isAllPoliciesOk = otherPolicies.every(isSatisfied);
+    self.arePoliciesRejected = otherPolicies.some(hasFailed);
 
     // undefined means "no reviewer policy configured", which is different from
     // "configured and not satisfied" - the status logic treats them apart.
     self.areReviewerPoliciesOk =
       reviewerPolicies.length === 0
         ? undefined
-        : reviewerPolicies.every((i) => i.status === "approved");
+        : reviewerPolicies.every(isSatisfied);
 
     policies
       .filter(

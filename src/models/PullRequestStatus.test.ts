@@ -12,6 +12,7 @@ const base = {
   votes: [] as number[],
   requiredVotes: [] as number[],
   nonReviewerPoliciesOk: true,
+  nonReviewerPoliciesFailed: false,
   reviewerPoliciesOk: undefined as boolean | undefined,
 };
 
@@ -135,6 +136,29 @@ describe("problems outrank everything", () => {
     });
 
     expect(status.kind).toBe("waitingForAuthor");
+  });
+
+  it("reports a failed check as a failure, not as something still running", () => {
+    const status = evaluatePullRequestStatus({
+      ...base,
+      votes: [NO_VOTE, NO_VOTE],
+      nonReviewerPoliciesOk: false,
+      nonReviewerPoliciesFailed: true,
+      reviewerPoliciesOk: false,
+    });
+
+    expect(status.kind).toBe("policiesFailed");
+  });
+
+  it("outranks a draft, so a draft with a failing check stays visible", () => {
+    const status = evaluatePullRequestStatus({
+      ...base,
+      isDraft: true,
+      nonReviewerPoliciesOk: false,
+      nonReviewerPoliciesFailed: true,
+    });
+
+    expect(status.kind).toBe("policiesFailed");
   });
 
   it("reports pending non-reviewer policies", () => {

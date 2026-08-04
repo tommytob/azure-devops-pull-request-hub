@@ -7,6 +7,7 @@ import { ReviewerVoteOption } from "./ReviewerVote";
  */
 export type PullRequestStatusKind =
   | "failed"
+  | "policiesFailed"
   | "rejected"
   | "waitingForAuthor"
   | "draft"
@@ -32,9 +33,15 @@ export interface PullRequestStatusInput {
   requiredVotes: number[];
   /**
    * Whether every enabled, blocking policy that is *not* about reviewers has
-   * been approved.
+   * been approved (or does not apply).
    */
   nonReviewerPoliciesOk: boolean;
+  /**
+   * Whether any of those policies was rejected or is broken. A failed check is
+   * a different thing from one that has not finished, and only one of the two
+   * is worth interrupting someone for.
+   */
+  nonReviewerPoliciesFailed: boolean;
   /**
    * Whether the reviewer policies (minimum approvers, required reviewers) are
    * satisfied. undefined when the repository has no such policy, in which case
@@ -64,6 +71,14 @@ export function evaluatePullRequestStatus(
       kind: "failed",
       label: "Pull Request is in failure status.",
       ariaLabel: "Pull Request is in failure status.",
+    };
+  }
+
+  if (input.nonReviewerPoliciesFailed) {
+    return {
+      kind: "policiesFailed",
+      label: "One or more policies failed",
+      ariaLabel: "One or more policies failed",
     };
   }
 
