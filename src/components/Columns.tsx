@@ -111,6 +111,7 @@ export function TitleColumn(
               <div className="flex-column">
                 <Link
                   className="bolt-link subtle"
+                  removeUnderline={true}
                   href={tableItem.repositoryHref}
                   target="_blank"
                 >
@@ -121,6 +122,7 @@ export function TitleColumn(
               <div className="flex-column">
                 <Link
                   className="bolt-link subtle"
+                  removeUnderline={true}
                   href={tableItem.sourceBranchHref}
                   target="_blank"
                 >
@@ -134,6 +136,7 @@ export function TitleColumn(
               <div className="flex-column">
                 <Link
                   className="bolt-link subtle"
+                  removeUnderline={true}
                   href={tableItem.targetBranchHref}
                   target="_blank"
                 >

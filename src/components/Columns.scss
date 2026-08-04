@@ -38,6 +38,20 @@
   color: rgb(221, 149, 14);
 }
 
+/**
+ * Repository and branch links sit quiet until hovered, the way Azure DevOps
+ * styles links in its own pull request list. removeUnderline on the Link takes
+ * the underline off with !important, so putting it back on hover has to match
+ * that - and the hover background it also brings is dropped, leaving the
+ * underline as the single cue.
+ */
+.second-line-row .bolt-link.no-underline-link {
+  &:hover {
+    background-color: unset;
+    text-decoration: underline !important;
+  }
+}
+
 .title-column-subdetails {
   text-align: center;
 }
