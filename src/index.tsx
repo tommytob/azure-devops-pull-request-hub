@@ -24,7 +24,7 @@ import { TeamProjectReference } from "azure-devops-extension-api/Core";
 import { CoreRestClient } from "azure-devops-extension-api/Core";
 import { getClient } from "azure-devops-extension-api";
 import * as Data from "./tabs/PulRequestsTabData";
-import { Spinner, SpinnerSize } from "office-ui-fabric-react";
+import { Spinner, SpinnerSize } from "azure-devops-ui/Spinner";
 
 interface IHubContentState {
   errorMessage: string;

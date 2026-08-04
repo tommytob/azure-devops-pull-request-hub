@@ -12,7 +12,7 @@ import {
   FILTER_STORE_KEY_NAME,
 } from "../models/constants";
 
-import { Spinner, SpinnerSize } from "office-ui-fabric-react";
+import { Spinner, SpinnerSize } from "azure-devops-ui/Spinner";
 
 // Custom
 import * as Data from "./PulRequestsTabData";

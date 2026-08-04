@@ -25,7 +25,7 @@ import { ITableColumn } from "azure-devops-ui/Table";
 import { Status } from "azure-devops-ui/Status";
 import { getStatusSizeValue, getStatusIcon } from "../models/constants";
 import { PullRequestModel } from "../models/PullRequestModel";
-import { Spinner } from "office-ui-fabric-react";
+import { Spinner } from "azure-devops-ui/Spinner";
 
 export const myApprovalStatuses: IListBoxItem[] = Object.keys(
   Data.ReviewerVoteOption

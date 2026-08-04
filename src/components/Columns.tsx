@@ -16,7 +16,8 @@ import {
 } from "./ReviewerVoteIconStatus";
 import { AuthenticatedPersona } from "./AuthenticatedPersona";
 import { PullRequestPillInfo } from "./PullRequestPillInfo";
-import { Link, Spinner, SpinnerSize } from "office-ui-fabric-react";
+import { Spinner, SpinnerSize } from "azure-devops-ui/Spinner";
+import { Link } from "azure-devops-ui/Link";
 import * as PullRequestModel from "../models/PullRequestModel";
 import { PillGroup } from "azure-devops-ui/PillGroup";
 import { Pill, PillSize, PillVariant } from "azure-devops-ui/Pill";
