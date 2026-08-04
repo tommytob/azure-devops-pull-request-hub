@@ -308,6 +308,10 @@ export class PullRequestsTab extends React.Component<
     let { savedProjects } = this.state;
     this.setState({
       pullRequests: [],
+      // Cleared here as well as in initializePage: getRepositories accumulates
+      // across projects, so without a reset every refresh appended another
+      // copy of every repository to the filter.
+      repositories: [],
     });
 
     const currentProjectId = localStorage.getItem(FILTER_STORE_KEY_NAME);
@@ -368,13 +372,18 @@ export class PullRequestsTab extends React.Component<
 
   private async getRepositories(projectId: string): Promise<GitRepositoryModel[]> {
     const repos = (await this.gitClient.getRepositories(projectId, true) as GitRepositoryModel[]).filter(r => !r.isDisabled);
-    let { repositories } = this.state;
+    const { repositories } = this.state;
 
-    repositories.push(...repos);
-    repositories = repositories.sort(Data.sortTagRepoTeamProject);
+    // A new array rather than pushing into state, and deduplicated by id so a
+    // repeated load cannot produce duplicates even if a reset is missed.
+    const merged = new Map(
+      [...repositories, ...repos].map((r) => [r.id, r])
+    );
 
     this.setState({
-      repositories,
+      repositories: Array.from(merged.values()).sort(
+        Data.sortTagRepoTeamProject
+      ),
     });
 
     return repos;
