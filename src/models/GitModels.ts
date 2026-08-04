@@ -101,7 +101,11 @@ export declare module AzureGitModels {
     startedDate: Date;
     completedDate: Date;
     status: string;
-    context: Context;
+    /**
+     * Absent until the policy has actually been evaluated - a build policy that
+     * has not run yet carries no context at all.
+     */
+    context?: Context;
   }
 
   export interface GitPolicyRoot {

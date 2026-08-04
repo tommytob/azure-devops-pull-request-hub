@@ -463,7 +463,12 @@ export class PullRequestModel {
             break;
           }
           case EvaluationPolicyType.Build: {
-            pullRequestPolicy.displayName = `${p.configuration.type.displayName} - ${p.context.buildDefinitionName}`;
+            // No context means the build has not run yet, so there is no
+            // definition name to show.
+            pullRequestPolicy.displayName =
+              p.context === undefined
+                ? p.configuration.type.displayName
+                : `${p.configuration.type.displayName} - ${p.context.buildDefinitionName}`;
             break;
           }
           case EvaluationPolicyType.RequiredReviewers: {
