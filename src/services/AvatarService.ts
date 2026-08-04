@@ -75,8 +75,6 @@ async function fetchAvatar(descriptor: string): Promise<string | undefined> {
       return undefined;
     }
 
-    console.info(`[avatar] loaded ${base64.length}b base64 for ${descriptor}`);
-
     return `data:image/png;base64,${base64}`;
   } catch (error) {
     console.warn(`[avatar] failed for ${descriptor}`, error);
