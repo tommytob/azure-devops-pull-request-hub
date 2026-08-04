@@ -14,7 +14,7 @@ import {
   RadioButtonGroupDirection,
 } from "azure-devops-ui/RadioButton";
 import { UserPreferencesInstance } from "../common";
-import { TeamProjectReference } from "azure-devops-extension-api/Core/Core";
+import { TeamProjectReference } from "azure-devops-extension-api/Core";
 
 export interface IUserSettingsProps {
   onDismiss: () => void;

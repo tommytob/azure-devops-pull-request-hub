@@ -1,4 +1,4 @@
-import { GitRepository } from "azure-devops-extension-api/Git/Git";
+import { GitRepository } from "azure-devops-extension-api/Git";
 
 export enum EvaluationPolicyType {
   MinimumReviewers = "fa4e907d-c16b-4a4c-9dfa-4906e5d171dd",

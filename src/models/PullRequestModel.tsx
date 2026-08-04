@@ -4,12 +4,12 @@ import {
   GitCommitRef,
   CommentThreadStatus,
   PullRequestStatus,
-} from "azure-devops-extension-api/Git/Git";
+} from "azure-devops-extension-api/Git";
 import * as DevOps from "azure-devops-extension-sdk";
 import { Statuses } from "azure-devops-ui/Status";
 import { getClient } from "azure-devops-extension-api";
-import { GitRestClient } from "azure-devops-extension-api/Git/GitClient";
-import { WorkItemTrackingRestClient } from "azure-devops-extension-api/WorkItemTracking/WorkItemTrackingClient";
+import { GitRestClient } from "azure-devops-extension-api/Git";
+import { WorkItemTrackingRestClient } from "azure-devops-extension-api/WorkItemTracking";
 import { hasPullRequestFailure } from "./constants";
 import {
   BranchDropDownItem,
@@ -18,17 +18,21 @@ import {
   PullRequestComment,
   PullRequestPolicy,
 } from "../tabs/PulRequestsTabData";
-import { WebApiTagDefinition } from "azure-devops-extension-api/Core/Core";
+import { WebApiTagDefinition } from "azure-devops-extension-api/Core";
 import { USER_SETTINGS_STORE_KEY } from "../common";
 import { getEvaluationsPerPullRequest } from "../services/AzureGitServices";
 import { EvaluationPolicyType } from "./GitModels";
-import { GitRepository } from 'azure-devops-extension-api/Git/Git';
+import { GitRepository } from 'azure-devops-extension-api/Git';
 import { compare } from "../lib/date";
-import { WorkItem } from "azure-devops-extension-api/WorkItemTracking/WorkItemTracking";
+import { WorkItem } from "azure-devops-extension-api/WorkItemTracking";
 
-export interface GitRepositoryModel extends GitRepository {
-  isDisabled: boolean | undefined;
-}
+/**
+ * Kept as an alias so call sites keep their intent. The interface used to
+ * widen isDisabled to boolean | undefined, which azure-devops-extension-api 5
+ * now declares as a required boolean - so the override no longer compiles and
+ * no longer adds anything.
+ */
+export type GitRepositoryModel = GitRepository;
 
 export class PullRequestModel {
   private baseHostUrl: string = "";

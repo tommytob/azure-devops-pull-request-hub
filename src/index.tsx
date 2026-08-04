@@ -15,13 +15,13 @@ import {
 } from "./common";
 import { PullRequestsTab } from "./tabs/PullRequestsTab";
 import { addPolyFills } from "./polyfills";
-import { PullRequestStatus } from "azure-devops-extension-api/Git/Git";
+import { PullRequestStatus } from "azure-devops-extension-api/Git";
 import { ObservableValue } from "azure-devops-ui/Core/Observable";
 import { Observer } from "azure-devops-ui/Observer";
 import { UserPreferencesPanel } from "./components/UserPreferencesPanel";
 import { Toast } from "azure-devops-ui/Toast";
-import { TeamProjectReference } from "azure-devops-extension-api/Core/Core";
-import { CoreRestClient } from "azure-devops-extension-api/Core/CoreClient";
+import { TeamProjectReference } from "azure-devops-extension-api/Core";
+import { CoreRestClient } from "azure-devops-extension-api/Core";
 import { getClient } from "azure-devops-extension-api";
 import * as Data from "./tabs/PulRequestsTabData";
 import { Spinner, SpinnerSize } from "office-ui-fabric-react";

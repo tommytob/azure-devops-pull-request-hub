@@ -1,8 +1,8 @@
 import * as DevOps from "azure-devops-extension-sdk";
 import { AzureGitModels } from "../models/GitModels";
-import { TeamProjectReference } from "azure-devops-extension-api/Core/Core";
+import { TeamProjectReference } from "azure-devops-extension-api/Core";
 import { IProjectInfo } from "azure-devops-extension-api";
-import { GitRepository } from "azure-devops-extension-api/Git/Git";
+import { GitRepository } from "azure-devops-extension-api/Git";
 import { PullRequestModel } from "../models/PullRequestModel";
 
 const evaluationApiUrl =

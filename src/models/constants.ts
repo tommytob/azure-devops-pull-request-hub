@@ -3,7 +3,7 @@ import { PillSize, PillVariant } from "azure-devops-ui/Pill";
 import { PillGroupOverflow } from "azure-devops-ui/PillGroup";
 import { CommonServiceIds } from "azure-devops-extension-api";
 import { ZeroDataActionType } from "azure-devops-ui/ZeroData";
-import { PullRequestAsyncStatus } from "azure-devops-extension-api/Git/Git";
+import { PullRequestAsyncStatus } from "azure-devops-extension-api/Git";
 import * as PullRequestModel from "../models/PullRequestModel";
 
 export const FILTER_STORE_KEY_NAME = 'prmh-current-filter';

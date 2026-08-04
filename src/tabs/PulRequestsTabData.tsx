@@ -3,15 +3,15 @@ import {
   GitPullRequestSearchCriteria,
   PullRequestStatus,
   IdentityRefWithVote,
-} from "azure-devops-extension-api/Git/Git";
+} from "azure-devops-extension-api/Git";
 import { IStatusProps } from "azure-devops-ui/Status";
 import { IColor } from "azure-devops-ui/Utilities/Color";
 import { SortOrder } from "azure-devops-ui/Table";
-import { IdentityRef } from "azure-devops-extension-api/WebApi/WebApi";
+import { IdentityRef } from "azure-devops-extension-api/WebApi";
 import {
   TeamProjectReference,
   WebApiTagDefinition
-} from "azure-devops-extension-api/Core/Core";
+} from "azure-devops-extension-api/Core";
 import { PullRequestModel } from "../models/PullRequestModel";
 import { compare } from "../lib/date";
 
@@ -160,7 +160,13 @@ export const draftColor: IColor = {
   blue: 250,
 };
 
-export const pullRequestCriteria: GitPullRequestSearchCriteria = {
+/**
+ * Cast rather than annotated: azure-devops-extension-api 5 declares every
+ * field of GitPullRequestSearchCriteria as required, including minTime,
+ * maxTime and queryTimeRangeType. Supplying values for those would narrow the
+ * query, so the omitted fields are left out deliberately.
+ */
+export const pullRequestCriteria = {
   repositoryId: "",
   creatorId: "",
   includeLinks: true,
@@ -169,7 +175,7 @@ export const pullRequestCriteria: GitPullRequestSearchCriteria = {
   sourceRepositoryId: "",
   status: PullRequestStatus.Active,
   targetRefName: "",
-};
+} as GitPullRequestSearchCriteria;
 
 /**
  * Custom type for the team to reduce the size of filter value in local storage

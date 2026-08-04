@@ -23,12 +23,12 @@ import * as DevOps from "azure-devops-extension-sdk";
 
 // Azure DevOps API
 import { IProjectPageService, getClient, IHostNavigationService } from "azure-devops-extension-api";
-import { GitRestClient } from "azure-devops-extension-api/Git/GitClient";
-import { CoreRestClient } from "azure-devops-extension-api/Core/CoreClient";
+import { GitRestClient } from "azure-devops-extension-api/Git";
+import { CoreRestClient } from "azure-devops-extension-api/Core";
 import {
   IdentityRefWithVote,
   PullRequestStatus,
-} from "azure-devops-extension-api/Git/Git";
+} from "azure-devops-extension-api/Git";
 
 // Azure DevOps UI
 import { ListSelection } from "azure-devops-ui/List";
@@ -53,13 +53,13 @@ import {
   TableColumnStyle,
 } from "azure-devops-ui/Table";
 import { ZeroData } from "azure-devops-ui/ZeroData";
-import { IdentityRef } from "azure-devops-extension-api/WebApi/WebApi";
+import { IdentityRef } from "azure-devops-extension-api/WebApi";
 import { ObservableValue } from "azure-devops-ui/Core/Observable";
 import {
   TeamProjectReference,
   WebApiTagDefinition,
   ProjectInfo
-} from "azure-devops-extension-api/Core/Core";
+} from "azure-devops-extension-api/Core";
 import { FilterBarHub } from "../components/FilterBarHub";
 import { hasPullRequestFailure } from "../models/constants";
 import { ContentSize } from "azure-devops-ui/Callout";
@@ -367,7 +367,7 @@ export class PullRequestsTab extends React.Component<
   }
 
   private async getRepositories(projectId: string): Promise<GitRepositoryModel[]> {
-    const repos = (await this.gitClient.getRepositories(projectId, true) as GitRepositoryModel[]).filter(r => r.isDisabled === undefined || r.isDisabled === false);
+    const repos = (await this.gitClient.getRepositories(projectId, true) as GitRepositoryModel[]).filter(r => !r.isDisabled);
     let { repositories } = this.state;
 
     repositories.push(...repos);

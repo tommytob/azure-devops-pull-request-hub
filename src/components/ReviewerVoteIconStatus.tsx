@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import * as Data from "../tabs/PulRequestsTabData";
-import { IdentityRefWithVote } from "azure-devops-extension-api/Git/Git";
+import { IdentityRefWithVote } from "azure-devops-extension-api/Git";
 import { Statuses, Status } from "azure-devops-ui/Status";
 import { getStatusSizeValue } from "../models/constants";
 

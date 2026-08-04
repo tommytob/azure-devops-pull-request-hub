@@ -7,7 +7,7 @@ import {
   TeamProjectReference,
   ProjectInfo,
   WebApiTagDefinition,
-} from "azure-devops-extension-api/Core/Core";
+} from "azure-devops-extension-api/Core";
 import { Filter } from "azure-devops-ui/Utilities/Filter";
 import { IListBoxItem } from "azure-devops-ui/ListBox";
 import {
@@ -17,9 +17,9 @@ import {
 import {
   GitRepository,
   IdentityRefWithVote,
-} from "azure-devops-extension-api/Git/Git";
+} from "azure-devops-extension-api/Git";
 import * as Data from "../tabs/PulRequestsTabData";
-import { IdentityRef } from "azure-devops-extension-api/WebApi/WebApi";
+import { IdentityRef } from "azure-devops-extension-api/WebApi";
 import { getVoteDescription } from "./Columns";
 import { ITableColumn } from "azure-devops-ui/Table";
 import { Status } from "azure-devops-ui/Status";
