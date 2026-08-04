@@ -16,8 +16,19 @@
  * - a quarter of the width spent on margin. This restores the spacing the rows
  * had before the upgrade. Raise the values if the checkbox sits too close to the
  * panel edge for your taste; nothing else depends on them.
+ *
+ * The library declares this nested, as
+ *
+ *     .bolt-table-container ul.bolt-list .bolt-list-row.bolt-list-box-multi-select-row
+ *
+ * so the selector below repeats that chain and adds
+ * .bolt-dropdown-list-box-container to outrank it. Matching its specificity
+ * exactly would leave the outcome depending on stylesheet order, which import
+ * order decides and which is not ours to rely on.
  */
-.bolt-list-row.bolt-list-box-multi-select-row {
+.bolt-dropdown-list-box-container.bolt-table-container
+    ul.bolt-list
+    .bolt-list-row.bolt-list-box-multi-select-row {
     gap: 0;
     padding-left: 0;
 }
