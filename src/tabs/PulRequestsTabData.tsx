@@ -17,51 +17,10 @@ import { compare } from "../lib/date";
 
 export const refsPreffix = "refs/heads/";
 
-export const approvedLightColor: IColor = {
-  red: 231,
-  green: 242,
-  blue: 231,
-};
-
-export const approvedWithSuggestionsLightColor: IColor = {
-  red: 231,
-  green: 242,
-  blue: 231,
-};
-
-export const noVoteLightColor: IColor = {
-  red: 218,
-  green: 227,
-  blue: 243,
-};
-
-export const waitingAuthorLightColor: IColor = {
-  red: 255,
-  green: 249,
-  blue: 230,
-};
-
-export const rejectedLightColor: IColor = {
-  red: 250,
-  green: 235,
-  blue: 235,
-};
-
 export const autoCompleteColor: IColor = {
   red: 235,
   green: 121,
   blue: 8,
-};
-
-export const reviewerVoteToIColorLight = (vote: number | string) => {
-  const colorMap: Record<string, IColor> = {
-    "10": approvedLightColor,
-    "5": approvedWithSuggestionsLightColor,
-    "0": noVoteLightColor,
-    "-5": waitingAuthorLightColor,
-    "-10": rejectedLightColor,
-  };
-  return colorMap[vote];
 };
 
 // Re-exported so the many existing import sites keep working; the enum itself

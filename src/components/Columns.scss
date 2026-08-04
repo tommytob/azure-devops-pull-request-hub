@@ -16,26 +16,26 @@
 
 .pill-draft.outlined {
   background-color: transparent;
-  border-color: rgb(152, 198, 255);
-  color: rgb(152, 198, 255);
+  border-color: $communication-foreground;
+  color: $communication-foreground;
 }
 
 .pill-conflicts.outlined {
   background-color: transparent;
-  border-color: rgb(241, 112, 123);
-  color: rgb(241, 112, 123);
+  border-color: $status-error-text;
+  color: $status-error-text;
 }
 
 .pill-required.outlined {
   background-color: transparent;
-  border-color: rgb(146, 144, 144);
-  color: rgb(146, 144, 144);
+  border-color: $neutral-60;
+  color: $neutral-60;
 }
 
 .pill-autocomplete.outlined {
   background-color: transparent;
-  border-color: rgb(221, 149, 14);
-  color: rgb(221, 149, 14);
+  border-color: $status-warning-text;
+  color: $status-warning-text;
 }
 
 /**
@@ -61,23 +61,23 @@
 }
 
 .icon-red{
-  color: red;
+  color: $status-error-text;
   font-size: x-large;
   font-weight: bold;
 
 }
 .icon-green{
-  color: green;
+  color: $status-success-text;
   font-size: x-large;
   font-weight: bold;
 }
 
 .icon-policy-red{
-  color: rgb(233, 0, 0);
+  color: $status-error-text;
 }
 
 .icon-policy-green{
-  color: rgb(1, 165, 1);
+  color: $status-success-text;
 }
 
 .span-tooltip{
@@ -101,28 +101,24 @@
 }
 
 .repos-pr-reviewer-vote-approvedLightColor img {
-  border-color: rgb(88,162,101);
+  border-color: $status-success-text;
 }
 
 .repos-pr-reviewer-vote-approvedWithSuggestionsLightColor img {
-  border-color: rgb(88,162,101);
+  border-color: $status-success-text;
   border-style: dotted;
 }
 
-.repos-pr-reviewer-vote-approvedWithSuggestionsLightColor img {
-  border-color: rgb(88,162,101);
-}
-
 .repos-pr-reviewer-vote-noVoteLightColor img {
-  border-color: rgb(18, 117, 200);
+  border-color: $communication-foreground;
 }
 
 .repos-pr-reviewer-vote-waitingAuthorLightColor img {
-  border-color: rgb(212,127,68);
+  border-color: $status-warning-text;
 }
 
 .repos-pr-reviewer-vote-rejectedLightColor img {
-  border-color: rgb(203,75,73);
+  border-color: $status-error-text;
 }
 
 .bolt-pill.hideText > div {

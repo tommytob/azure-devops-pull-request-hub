@@ -1,5 +1,13 @@
 @import "azure-devops-ui/Core/_platformCommon.scss";
 
+/**
+ * These two stay hardcoded on purpose. They are filled buttons carrying a white
+ * icon, and the Azure DevOps status tokens differ in luminance between themes -
+ * $status-success-background for instance is the pale tint used behind success
+ * messages, not a button fill. Swapping them in without checking the contrast
+ * against that white icon in both themes risks an invisible button, which is
+ * worse than a fixed colour that works today.
+ */
 .clear-filter-button.bolt-icon-button.enabled.primary {
   background-color: #a4262c;
 }
