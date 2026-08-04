@@ -6,6 +6,22 @@
     display: flex;
 }
 
+/**
+ * azure-devops-ui 2.276 introduced DropdownList.scss, a file that did not exist
+ * in 2.167, and with it:
+ *
+ *     .bolt-list-row.bolt-list-box-multi-select-row { gap: 10px; padding: 0 20px 0 16px; }
+ *
+ * In a 199px wide filter dropdown that pushes the label 47px from the left edge
+ * - a quarter of the width spent on margin. This restores the spacing the rows
+ * had before the upgrade. Raise the values if the checkbox sits too close to the
+ * panel edge for your taste; nothing else depends on them.
+ */
+.bolt-list-row.bolt-list-box-multi-select-row {
+    gap: 0;
+    padding-left: 0;
+}
+
 .left-content-spacing {
     margin-left: 16px;
 }
