@@ -28,6 +28,7 @@ import {
 } from "./PullRequestStatus";
 import { GitRepository } from 'azure-devops-extension-api/Git';
 import { mostRecent } from "../lib/date";
+import { createLimiter } from "../lib/limitConcurrency";
 import { WorkItem } from "azure-devops-extension-api/WorkItemTracking";
 
 /**
@@ -37,6 +38,19 @@ import { WorkItem } from "azure-devops-extension-api/WorkItemTracking";
  * no longer adds anything.
  */
 export type GitRepositoryModel = GitRepository;
+
+/**
+ * Shared by every model on purpose: the tab builds one model per pull request in
+ * a single loop, and each fires five requests, so without a shared ceiling a few
+ * hundred pull requests put over a thousand fetches in flight at once. Azure
+ * DevOps then answers ERR_FAILED and the catches swallow it, leaving rows
+ * without labels or work items.
+ *
+ * 16 is a compromise: low enough that the requests actually complete, high
+ * enough that loading does not crawl. Raise it if loading feels slow and the
+ * console stays clean; lower it if ERR_FAILED comes back.
+ */
+const requestLimiter = createLimiter(16);
 
 export class PullRequestModel {
   private baseHostUrl: string = "";
@@ -167,28 +181,35 @@ export class PullRequestModel {
     this.initializeData();
     this.loadingData = true;
 
-    Promise.all(this.getAsyncCallList()).finally(() => {
+    Promise.all(
+      this.getAsyncCallList().map((call) => requestLimiter(call))
+    ).finally(() => {
       this.callTriggerState();
     });
   }
 
-  private getAsyncCallList(): Promise<any>[] {
+  /**
+   * Returns functions rather than promises: calling the methods here would fire
+   * every request the moment a model is constructed, which is exactly what the
+   * limiter exists to prevent.
+   */
+  private getAsyncCallList(): Array<() => Promise<any>> {
     const abandoned =
       this.gitPullRequest.status === PullRequestStatus.Abandoned;
-    let callList = [];
+    let callList: Array<() => Promise<any>> = [];
 
     if (abandoned === false) {
       callList.push(
         ...[
-          this.getPullRequestAdditionalDetailsAsync(),
-          this.getPullRequestThreadAsync(),
-          this.getPullRequestWorkItemAsync(),
-          this.getPullRequestPolicyAsync(),
+          () => this.getPullRequestAdditionalDetailsAsync(),
+          () => this.getPullRequestThreadAsync(),
+          () => this.getPullRequestWorkItemAsync(),
+          () => this.getPullRequestPolicyAsync(),
         ]
       );
     }
 
-    callList.push(this.getLabels());
+    callList.push(() => this.getLabels());
 
     return callList;
   }
