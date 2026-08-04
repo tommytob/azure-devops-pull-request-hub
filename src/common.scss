@@ -26,6 +26,16 @@
  * exactly would leave the outcome depending on stylesheet order, which import
  * order decides and which is not ours to rely on.
  */
+/**
+ * And the larger half of the same problem: ul.bolt-list sets margin: 0 but no
+ * padding, so the browser's default padding-inline-start of 40px applies. In a
+ * 256px dropdown that alone accounted for most of the indent - measured at
+ * panel 403, ul 403 with 40px padding, row 443.
+ */
+.bolt-dropdown-list-box-container.bolt-table-container ul.bolt-list {
+    padding-left: 0;
+}
+
 .bolt-dropdown-list-box-container.bolt-table-container
     ul.bolt-list
     .bolt-list-row.bolt-list-box-multi-select-row {
