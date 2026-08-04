@@ -6,7 +6,7 @@ import {
   PullRequestStatus,
 } from "azure-devops-extension-api/Git";
 import * as DevOps from "azure-devops-extension-sdk";
-import { Statuses } from "azure-devops-ui/Status";
+import { IStatusProps, Statuses } from "azure-devops-ui/Status";
 import { getClient } from "azure-devops-extension-api";
 import { GitRestClient } from "azure-devops-extension-api/Git";
 import { WorkItemTrackingRestClient } from "azure-devops-extension-api/WorkItemTracking";
@@ -21,7 +21,11 @@ import {
 import { WebApiTagDefinition } from "azure-devops-extension-api/Core";
 import { USER_SETTINGS_STORE_KEY } from "../common";
 import { getEvaluationsPerPullRequest } from "../services/AzureGitServices";
-import { EvaluationPolicyType } from "./GitModels";
+import { AzureGitModels, EvaluationPolicyType } from "./GitModels";
+import {
+  evaluatePullRequestStatus,
+  PullRequestStatusKind,
+} from "./PullRequestStatus";
 import { GitRepository } from 'azure-devops-extension-api/Git';
 import { compare } from "../lib/date";
 import { WorkItem } from "azure-devops-extension-api/WorkItemTracking";
@@ -56,6 +60,13 @@ export class PullRequestModel {
   public comment: PullRequestComment;
   public policies: PullRequestPolicy[] = [];
   public isAllPoliciesOk: boolean = false;
+  /**
+   * Whether the reviewer policies are satisfied, or undefined when the
+   * repository has no reviewer policy at all. Kept apart from
+   * isAllPoliciesOk so a pending approval reads as "waiting review" rather
+   * than drowning out the other policies.
+   */
+  public areReviewerPoliciesOk: boolean | undefined = undefined;
   public hasFailures: boolean = false;
   public labels: WebApiTagDefinition[] = [];
   public lastVisit?: Date;
@@ -233,83 +244,45 @@ export class PullRequestModel {
     return voteResult;
   }
 
-  private getStatusIndicatorData(reviewers: IdentityRefWithVote[], isAllPoliciesOk: boolean): IStatusIndicatorData {
-    const indicatorData: IStatusIndicatorData = {
-      label: "Waiting Review",
-      statusProps: { ...Statuses.Queued, ariaLabel: "Waiting Review" },
+  /**
+   * Statuses.Running is deliberately absent here: it renders the same spinner
+   * the table shows while a row is still loading, which made a pending policy
+   * indistinguishable from an unfinished fetch.
+   */
+  private static readonly statusPropsByKind: Record<
+    PullRequestStatusKind,
+    IStatusProps
+  > = {
+    failed: Statuses.Failed,
+    rejected: Statuses.Failed,
+    waitingForAuthor: Statuses.Warning,
+    draft: Statuses.Queued,
+    policiesPending: Statuses.Waiting,
+    waitingReview: Statuses.Waiting,
+    reviewInProgress: Statuses.Waiting,
+    ready: Statuses.Success,
+  };
+
+  private getStatusIndicatorData(
+    reviewers: IdentityRefWithVote[],
+    isAllPoliciesOk: boolean
+  ): IStatusIndicatorData {
+    const status = evaluatePullRequestStatus({
+      isDraft: this.gitPullRequest.isDraft === true,
+      hasFailures: this.hasFailures,
+      votes: (reviewers || []).map((r) => r.vote),
+      requiredVotes: this.requiredReviewers.map((r) => r.vote),
+      nonReviewerPoliciesOk: isAllPoliciesOk,
+      reviewerPoliciesOk: this.areReviewerPoliciesOk,
+    });
+
+    return {
+      label: status.label,
+      statusProps: {
+        ...PullRequestModel.statusPropsByKind[status.kind],
+        ariaLabel: status.ariaLabel,
+      },
     };
-
-    if (this.hasFailures) {
-      indicatorData.statusProps = {
-        ...Statuses.Failed,
-        ariaLabel: "Pull Request is in failure status.",
-      };
-      indicatorData.label = "Pull Request is in failure status.";
-
-      return indicatorData;
-    }
-
-    if (reviewers.some((r) => r.vote === ReviewerVoteOption.Rejected)) {
-      indicatorData.statusProps = {
-        ...Statuses.Failed,
-        ariaLabel: "One or more reviewer(s) has rejected.",
-      };
-      indicatorData.label = "One or more reviewer(s) has rejected.";
-
-      return indicatorData;
-    }
-
-    if (reviewers.some((r) => r.vote === ReviewerVoteOption.WaitingForAuthor)) {
-      indicatorData.statusProps = {
-        ...Statuses.Warning,
-        ariaLabel: "One or more reviewer(s) is waiting for the author.",
-      };
-      indicatorData.label = "One or more reviewer(s) is waiting for the author.";
-
-      return indicatorData;
-    }
-
-    if (this.requiredReviewers.every((r) => r.vote === ReviewerVoteOption.Approved || r.vote === ReviewerVoteOption.ApprovedWithSuggestions)  && isAllPoliciesOk) {
-      indicatorData.statusProps = {
-        ...Statuses.Success,
-        ariaLabel: "Ready for completion",
-      };
-      indicatorData.label = "Success";
-
-      return indicatorData;
-    }
-
-    if (isAllPoliciesOk === false) {
-      indicatorData.statusProps = {
-        ...Statuses.Running,
-        ariaLabel: "Waiting all policies to be completed",
-      };
-      indicatorData.label = "Some policies are not completed";
-
-      return indicatorData;
-    }
-
-    if (this.requiredReviewers.every((r) => r.vote === ReviewerVoteOption.NoVote)) {
-      indicatorData.statusProps = {
-        ...Statuses.Waiting,
-        ariaLabel: "Waiting Review of required Reviewers",
-      };
-      indicatorData.label = "Waiting Review of required Reviewers";
-
-      return indicatorData;
-    }
-
-    if (this.requiredReviewers.some((r) => r.vote === ReviewerVoteOption.NoVote)) {
-      indicatorData.statusProps = {
-        ...Statuses.Running,
-        ariaLabel: "Waiting remaining required Reviewers",
-      };
-      indicatorData.label = "Review in progress";
-
-      return indicatorData;
-    }
-
-    return indicatorData;
   }
 
   private async getPullRequestAdditionalDetailsAsync() {
@@ -435,17 +408,27 @@ export class PullRequestModel {
       this.gitPullRequest.pullRequestId
     );
 
-    self.isAllPoliciesOk =
-      policies.length === 0 ||
-      policies
-        .filter(
-          (i) =>
-            i.configuration.isEnabled === true &&
-            i.configuration.isBlocking === true
-        )
-        .every((i) => {
-          return i.status === "approved";
-        });
+    const blockingPolicies = policies.filter(
+      (i) =>
+        i.configuration.isEnabled === true && i.configuration.isBlocking === true
+    );
+
+    const isReviewerPolicy = (i: AzureGitModels.Value): boolean =>
+      i.configuration.type.id === EvaluationPolicyType.MinimumReviewers ||
+      i.configuration.type.id === EvaluationPolicyType.RequiredReviewers;
+
+    const reviewerPolicies = blockingPolicies.filter(isReviewerPolicy);
+
+    self.isAllPoliciesOk = blockingPolicies
+      .filter((i) => isReviewerPolicy(i) === false)
+      .every((i) => i.status === "approved");
+
+    // undefined means "no reviewer policy configured", which is different from
+    // "configured and not satisfied" - the status logic treats them apart.
+    self.areReviewerPoliciesOk =
+      reviewerPolicies.length === 0
+        ? undefined
+        : reviewerPolicies.every((i) => i.status === "approved");
 
     policies
       .filter(

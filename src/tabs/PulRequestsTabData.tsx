@@ -64,13 +64,9 @@ export const reviewerVoteToIColorLight = (vote: number | string) => {
   return colorMap[vote];
 };
 
-export enum ReviewerVoteOption {
-  Approved = 10,
-  ApprovedWithSuggestions = 5,
-  Rejected = -10,
-  WaitingForAuthor = -5,
-  NoVote = 0,
-}
+// Re-exported so the many existing import sites keep working; the enum itself
+// lives in a module without UI imports.
+export { ReviewerVoteOption } from "../models/ReviewerVote";
 
 export enum YesOrNo {
   No = 0,
