@@ -1,46 +1,58 @@
+# Publishes the DEV extension, whose manifest points baseUri at
+# https://localhost:3000. It is only useful next to a running `npm start`, so it
+# no longer fires on main - releases go through release.yml.
 name: Release Pull Request Manager Hub - DEV
 
 on:
   push:
-    branches: [ development, main ]
-
-env:
-  EXTENSION_VERSION_COMMAND: "export EXTENSION_VERSION_GH=\"2.$(date +'%Y%m%d').$GITHUB_RUN_NUMBER\" && echo \"EXTENSION_VERSION=$EXTENSION_VERSION_GH\" >> $GITHUB_ENV"
-  EXTENSION_VERSION_JSON_COMMAND: "echo \"{\"version\": \"$EXTENSION_VERSION_GH\"}\" > vss-extension.version.json"
+    branches: [development]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: set env
-        run: "${{ env.EXTENSION_VERSION_COMMAND }}"
-      - name: set version
-        run: "${{ env.EXTENSION_VERSION_JSON_COMMAND }}"
+      # Checkout comes first: the version stamp writes a file into the working
+      # tree, and a later checkout would overwrite it.
       - name: Checkout the code
-        uses: actions/checkout@v2
-      - name: Add nuget to PATH
-        uses: nuget/setup-nuget@v1
-      - name: Install TFX CLI
-        run: npm i -g tfx-cli
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+      - name: Stamp the extension version
+        run: |
+          VERSION="2.$(date +'%Y%m%d').${GITHUB_RUN_NUMBER}"
+          printf '{"version": "%s"}\n' "${VERSION}" > vss-extension.version.json
+          echo "EXTENSION_VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "Stamped version ${VERSION}"
+      - name: Install
+        run: npm ci
       - name: Build
-        run: npm install && npm run build
+        run: npm run build
+      # tfx-cli is a devDependency, so npm run puts it on PATH - no global install.
       - name: Package
         run: npm run package-dev
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
-          name: "pull-request-manager-hub-extension"
-          path: "${{ github.workspace }}/azure-devops-pull-request-manager-hub.vsix"
+          name: pull-request-manager-hub-extension-dev
+          path: azure-devops-pull-request-manager-hub.vsix
+          if-no-files-found: error
+
   deploy:
     runs-on: ubuntu-latest
-    environment: 'dev'
+    environment: dev
     needs: build
     steps:
-      - uses: actions/download-artifact@v4.1.7
+      - uses: actions/download-artifact@v4
         with:
-          name: "pull-request-manager-hub-extension"
-      - name: Add nuget to PATH
-        uses: nuget/setup-nuget@v1
-      - name: Install TFX CLI
-        run: npm i -g tfx-cli
+          name: pull-request-manager-hub-extension-dev
       - name: Publish Extension - DEV
-        run: tfx extension publish --json --publisher ${{ vars.PUBLISHER_ID }} --service-url https://marketplace.visualstudio.com/ --vsix "${{ github.workspace }}/azure-devops-pull-request-manager-hub.vsix" --share-with ${{ vars.SHARE_WITH }} --auth-type pat --token ${{ secrets.ADO_TOKEN }}
+        run: >
+          npx --yes tfx-cli extension publish --json
+          --publisher "${{ vars.PUBLISHER_ID }}"
+          --service-url https://marketplace.visualstudio.com/
+          --vsix azure-devops-pull-request-manager-hub.vsix
+          --share-with "${{ vars.SHARE_WITH }}"
+          --auth-type pat --token "${{ secrets.ADO_TOKEN }}"

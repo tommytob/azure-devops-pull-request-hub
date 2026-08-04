@@ -1,0 +1,63 @@
+# Builds and publishes the real extension, so a release is a tag push rather
+# than a manual upload.
+#
+# Requires, in the repository settings:
+#   vars.PUBLISHER_ID  - the Marketplace publisher, e.g. Transheroes
+#   vars.SHARE_WITH    - the Azure DevOps organisation to share with
+#   secrets.ADO_TOKEN  - a PAT with Marketplace (Manage) over all organisations
+name: Release Pull Request Manager Hub
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Extension version, e.g. 2.3.1"
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+      # A tag push takes the version from the tag (v2.3.1 -> 2.3.1); a manual run
+      # takes it from the input. Written after checkout so it survives.
+      - name: Stamp the extension version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "${VERSION}" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          printf '{"version": "%s"}\n' "${VERSION}" > vss-extension.version.json
+          echo "EXTENSION_VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "Releasing version ${VERSION}"
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test -- --watchAll=false
+      - name: Build
+        run: npm run build
+      - name: Package
+        run: npm run package-release
+      - name: Publish to the Marketplace
+        run: >
+          npx --yes tfx-cli extension publish --json
+          --publisher "${{ vars.PUBLISHER_ID }}"
+          --service-url https://marketplace.visualstudio.com/
+          --vsix azure-devops-pull-request-manager-hub.vsix
+          --share-with "${{ vars.SHARE_WITH }}"
+          --auth-type pat --token "${{ secrets.ADO_TOKEN }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ env.EXTENSION_VERSION }}
+          path: azure-devops-pull-request-manager-hub.vsix
+          if-no-files-found: error
