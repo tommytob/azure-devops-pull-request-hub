@@ -27,7 +27,7 @@ import {
   PullRequestStatusKind,
 } from "./PullRequestStatus";
 import { GitRepository } from 'azure-devops-extension-api/Git';
-import { compare } from "../lib/date";
+import { mostRecent } from "../lib/date";
 import { WorkItem } from "azure-devops-extension-api/WorkItemTracking";
 
 /**
@@ -336,8 +336,9 @@ export class PullRequestModel {
             x.status === CommentThreadStatus.WontFix ||
             x.status === CommentThreadStatus.Fixed
         );
-        const lastUpdatedDate = threads.map(x => x.lastUpdatedDate)
-          .reduce((x, y) => compare(x, y) > 0 ? x : y); // Get most recent
+        const lastUpdatedDate = mostRecent(
+          threads.map((x) => x.lastUpdatedDate)
+        );
 
         self.comment = new PullRequestComment();
         self.comment.totalcomment = threads.length;
@@ -346,7 +347,7 @@ export class PullRequestModel {
       })
       .catch((error) => {
         console.log(
-          "There was an error calling the Pull Request threads (method: getPullRequestThreadAsync)."
+          "There was an error handling the Pull Request threads (method: getPullRequestThreadAsync). Note this covers processing the response as well as the call itself."
         );
         console.log(error);
       });
