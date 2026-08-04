@@ -927,18 +927,24 @@ export class PullRequestsTab extends React.Component<
     const sortingBehavior = new ColumnSorting<
       PullRequestModel.PullRequestModel
     >((columnIndex: number, proposedSortOrder: SortOrder) => {
-      this.pullRequestItemProvider.splice(
-        0,
-        this.pullRequestItemProvider.length,
-        ...sortItems<PullRequestModel.PullRequestModel>(
-          columnIndex,
-          proposedSortOrder,
-          this.sortFunctions,
-          this.columns,
-          pullRequests
-        )
+      // Sort the full list and let the filter derive what is visible from it.
+      // Writing the sorted full list straight into the item provider discarded
+      // any active filter, and left the tab count behind as well, since only
+      // filterPullRequests keeps that in step.
+      const sorted = sortItems<PullRequestModel.PullRequestModel>(
+        columnIndex,
+        proposedSortOrder,
+        this.sortFunctions,
+        this.columns,
+        pullRequests
       );
-      this.setState({ sortOrder: proposedSortOrder });
+
+      this.setState(
+        { pullRequests: sorted, sortOrder: proposedSortOrder },
+        () => {
+          this.filterPullRequests();
+        }
+      );
     });
 
     if (
