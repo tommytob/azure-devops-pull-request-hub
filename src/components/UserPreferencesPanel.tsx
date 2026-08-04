@@ -49,7 +49,9 @@ export function UserPreferencesPanel(props: IUserSettingsProps): JSX.Element {
     });
   }
 
-  const topNumberCompletedAbandoned = new ObservableValue<string>(
+  // Typed as possibly undefined because TextField's value prop accepts
+  // IReadonlyObservableValue<string | undefined>.
+  const topNumberCompletedAbandoned = new ObservableValue<string | undefined>(
     UserPreferencesInstance.topNumberCompletedAbandoned.toString()
   );
   const selectedDefaultSorting = new ObservableValue<string>(
