@@ -17,6 +17,7 @@ import { Spinner, SpinnerSize } from "azure-devops-ui/Spinner";
 // Custom
 import * as Data from "./PulRequestsTabData";
 import * as PullRequestModel from "../models/PullRequestModel";
+import { clearCache } from "../services/PullRequestCache";
 
 // Azure DevOps SDK
 import * as DevOps from "azure-devops-extension-sdk";
@@ -830,6 +831,11 @@ export class PullRequestsTab extends React.Component<
   };
 
   refresh = async () => {
+    // The explicit refresh always goes to the API. It is the escape hatch for a
+    // cached policy or comment count that has gone stale, so it must not be
+    // served from the cache it is meant to bypass.
+    clearCache();
+
     await this.loadAllProjects();
   };
 

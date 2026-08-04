@@ -29,6 +29,7 @@ import {
 import { GitRepository } from 'azure-devops-extension-api/Git';
 import { mostRecent } from "../lib/date";
 import { createLimiter } from "../lib/limitConcurrency";
+import { CacheBucket, readCache, writeCache } from "../services/PullRequestCache";
 import { WorkItem } from "azure-devops-extension-api/WorkItemTracking";
 
 /**
@@ -51,6 +52,40 @@ export type GitRepositoryModel = GitRepository;
  * console stays clean; lower it if ERR_FAILED comes back.
  */
 const requestLimiter = createLimiter(16);
+
+/**
+ * Cached shapes hold only what the UI reads, and dates as milliseconds.
+ * JSON turns a Date into a string, and a revived string compared against a Date
+ * does not throw - it quietly gives the wrong answer, which is how
+ * hasCommentChanges would start lying.
+ */
+interface DetailsCache {
+  isAutoCompleteSet: boolean;
+  committerDateMs?: number;
+}
+
+interface ThreadsCache {
+  totalcomment: number;
+  terminatedComment: number;
+  lastUpdatedDateMs?: number;
+}
+
+interface WorkItemsCache {
+  workItemsCount: number;
+  /** Only id, type and title are rendered, so a full WorkItem is not stored. */
+  workItems: Array<{ id: number; fields: { [field: string]: any } }>;
+}
+
+interface LabelsCache {
+  labels: WebApiTagDefinition[];
+}
+
+interface PoliciesCache {
+  policies: PullRequestPolicy[];
+  isAllPoliciesOk: boolean;
+  areReviewerPoliciesOk: boolean | undefined;
+  arePoliciesRejected: boolean;
+}
 
 export class PullRequestModel {
   private baseHostUrl: string = "";
@@ -170,6 +205,32 @@ export class PullRequestModel {
 
   public isStillLoading() {
     return this.loadingData;
+  }
+
+  /**
+   * What the cache is keyed against besides the pull request id. A push changes
+   * this and invalidates every bucket at once, which is the only change signal
+   * Azure DevOps gives us for free.
+   */
+  private get cacheToken(): string {
+    return this.gitPullRequest.lastMergeSourceCommit.commitId;
+  }
+
+  private cacheRead<T>(bucket: CacheBucket): T | undefined {
+    return readCache<T>(
+      bucket,
+      this.gitPullRequest.pullRequestId,
+      this.cacheToken
+    );
+  }
+
+  private cacheWrite<T>(bucket: CacheBucket, payload: T): void {
+    writeCache<T>(
+      bucket,
+      this.gitPullRequest.pullRequestId,
+      this.cacheToken,
+      payload
+    );
   }
 
   private callTriggerState() {
@@ -311,6 +372,22 @@ export class PullRequestModel {
   }
 
   private async getPullRequestAdditionalDetailsAsync() {
+    const cached = this.cacheRead<DetailsCache>("details");
+
+    if (cached !== undefined) {
+      this.isAutoCompleteSet = cached.isAutoCompleteSet;
+      // Only committer.date is ever read off this, so a minimal stand-in is
+      // enough - see getLastCommitDate.
+      this.lastCommitDetails =
+        cached.committerDateMs === undefined
+          ? undefined
+          : ({
+              committer: { date: new Date(cached.committerDateMs) },
+            } as GitCommitRef);
+
+      return;
+    }
+
     const gitClient: GitRestClient = getClient(GitRestClient);
     let self = this;
 
@@ -321,12 +398,17 @@ export class PullRequestModel {
       )
       .then((value) => {
         self.isAutoCompleteSet = value.autoCompleteSetBy !== undefined;
-
-        if (value.lastMergeCommit === undefined) {
-          return;
-        }
-
         self.lastCommitDetails = value.lastMergeCommit;
+
+        const committerDate = self.lastCommitDetails?.committer?.date;
+
+        self.cacheWrite<DetailsCache>("details", {
+          isAutoCompleteSet: self.isAutoCompleteSet,
+          committerDateMs:
+            committerDate === undefined
+              ? undefined
+              : new Date(committerDate).getTime(),
+        });
       })
       .catch((error) => {
         console.log(
@@ -337,6 +419,20 @@ export class PullRequestModel {
   }
 
   private async getPullRequestThreadAsync() {
+    const cached = this.cacheRead<ThreadsCache>("threads");
+
+    if (cached !== undefined) {
+      this.comment = new PullRequestComment();
+      this.comment.totalcomment = cached.totalcomment;
+      this.comment.terminatedComment = cached.terminatedComment;
+      this.comment.lastUpdatedDate =
+        cached.lastUpdatedDateMs === undefined
+          ? undefined
+          : new Date(cached.lastUpdatedDateMs);
+
+      return;
+    }
+
     const gitClient: GitRestClient = getClient(GitRestClient);
     let self = this;
 
@@ -365,6 +461,15 @@ export class PullRequestModel {
         self.comment.totalcomment = threads.length;
         self.comment.terminatedComment = terminatedThread.length;
         self.comment.lastUpdatedDate = lastUpdatedDate;
+
+        self.cacheWrite<ThreadsCache>("threads", {
+          totalcomment: self.comment.totalcomment,
+          terminatedComment: self.comment.terminatedComment,
+          lastUpdatedDateMs:
+            lastUpdatedDate === undefined
+              ? undefined
+              : new Date(lastUpdatedDate).getTime(),
+        });
       })
       .catch((error) => {
         console.log(
@@ -375,9 +480,19 @@ export class PullRequestModel {
   }
 
   private async getPullRequestWorkItemAsync() {
+    const cached = this.cacheRead<WorkItemsCache>("workItems");
+
+    if (cached !== undefined) {
+      this.workItemsCount = cached.workItemsCount;
+      this.workItems = cached.workItems as WorkItem[];
+
+      return;
+    }
+
     const gitClient: GitRestClient = getClient(GitRestClient);
     let self = this;
     let workItemIds : number[] = [];
+    let refsLoaded = false;
 
     await gitClient
       .getPullRequestWorkItemRefs(
@@ -388,35 +503,67 @@ export class PullRequestModel {
       .then((value) => {
         self.workItemsCount = value !== undefined ? value.length : 0;
         workItemIds = value.map(v => Number(v.id));
+        refsLoaded = true;
       })
       .catch((error) => {
         console.log("There was an error calling the Pull Request work item (method: getPullRequestWorkItemAsync).");
         console.log(error);
       });
 
-      await this.getWorkItemsAsync(workItemIds);
+    const itemsLoaded = await this.getWorkItemsAsync(workItemIds);
+
+    // Only cache when both calls came back. Storing a count of zero from a
+    // failed request would read as "no work items" for the next quarter hour.
+    if (refsLoaded && itemsLoaded) {
+      self.cacheWrite<WorkItemsCache>("workItems", {
+        workItemsCount: self.workItemsCount,
+        workItems: self.workItems.map((workItem) => ({
+          id: workItem.id,
+          fields: {
+            "System.WorkItemType": workItem.fields["System.WorkItemType"],
+            "System.Title": workItem.fields["System.Title"],
+          },
+        })),
+      });
+    }
   }
 
-  private async getWorkItemsAsync(workItemIds : number[]) {
+  /** Returns whether the work items were retrieved, so the caller knows if the result is cacheable. */
+  private async getWorkItemsAsync(workItemIds : number[]): Promise<boolean> {
     if (workItemIds.length === 0) {
-      return;
+      return true;
     }
 
     const gitClient: WorkItemTrackingRestClient = getClient(WorkItemTrackingRestClient);
     let self = this;
+    let loaded = false;
 
     await gitClient
       .getWorkItems(workItemIds, self.projectName)
       .then((value) => {
         self.workItems = value.sort(m => m.id);
+        loaded = true;
       })
       .catch((error) => {
         console.log("There was an error calling the Work Item (method: getWorkItemsAsync).");
         console.log(error);
       });
+
+    return loaded;
   }
 
   private async getPullRequestPolicyAsync() {
+    const cached = this.cacheRead<PoliciesCache>("policies");
+
+    if (cached !== undefined) {
+      this.policies = cached.policies;
+      this.isAllPoliciesOk = cached.isAllPoliciesOk;
+      this.areReviewerPoliciesOk = cached.areReviewerPoliciesOk;
+      this.arePoliciesRejected = cached.arePoliciesRejected;
+
+      return;
+    }
+
     let self = this;
 
     ///** Work in Progress :-) */
@@ -513,9 +660,25 @@ export class PullRequestModel {
         self.policies.push(pullRequestPolicy);
         return p;
       });
+
+    // This method has no catch, so reaching here means every step succeeded.
+    self.cacheWrite<PoliciesCache>("policies", {
+      policies: self.policies,
+      isAllPoliciesOk: self.isAllPoliciesOk,
+      areReviewerPoliciesOk: self.areReviewerPoliciesOk,
+      arePoliciesRejected: self.arePoliciesRejected,
+    });
   }
 
   private async getLabels() {
+    const cached = this.cacheRead<LabelsCache>("labels");
+
+    if (cached !== undefined) {
+      this.labels = cached.labels;
+
+      return;
+    }
+
     const gitClient: GitRestClient = getClient(GitRestClient);
     let self = this;
 
@@ -526,6 +689,7 @@ export class PullRequestModel {
       )
       .then((data) => {
         self.labels = data;
+        self.cacheWrite<LabelsCache>("labels", { labels: data });
       })
       .catch((error) => {
         console.log(
