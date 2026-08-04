@@ -29,7 +29,9 @@
 .bolt-dropdown-list-box-container.bolt-table-container
     ul.bolt-list
     .bolt-list-row.bolt-list-box-multi-select-row {
-    gap: 0;
+    // Checkbox hard left, but keep some air before the label - the library's
+    // 16px indent was the problem, not the gap between the two.
+    gap: 8px;
     padding-left: 0;
 }
 
