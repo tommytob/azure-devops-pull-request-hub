@@ -74,14 +74,6 @@ export function evaluatePullRequestStatus(
     };
   }
 
-  if (input.nonReviewerPoliciesFailed) {
-    return {
-      kind: "policiesFailed",
-      label: "One or more policies failed",
-      ariaLabel: "One or more policies failed",
-    };
-  }
-
   if (votes.some((v) => v === ReviewerVoteOption.Rejected)) {
     return {
       kind: "rejected",
@@ -103,6 +95,18 @@ export function evaluatePullRequestStatus(
       kind: "draft",
       label: "Draft",
       ariaLabel: "Draft - not ready for completion",
+    };
+  }
+
+  // Below the draft check on purpose: failing checks on a draft are expected and
+  // not something anyone needs to act on, so "this is a draft" is the more
+  // useful signal there. Merge conflicts stay above it, because those do not
+  // resolve themselves.
+  if (input.nonReviewerPoliciesFailed) {
+    return {
+      kind: "policiesFailed",
+      label: "One or more policies failed",
+      ariaLabel: "One or more policies failed",
     };
   }
 

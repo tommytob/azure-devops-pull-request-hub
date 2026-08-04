@@ -150,7 +150,7 @@ describe("problems outrank everything", () => {
     expect(status.kind).toBe("policiesFailed");
   });
 
-  it("outranks a draft, so a draft with a failing check stays visible", () => {
+  it("stays out of the way on a draft, where failing checks are expected", () => {
     const status = evaluatePullRequestStatus({
       ...base,
       isDraft: true,
@@ -158,7 +158,18 @@ describe("problems outrank everything", () => {
       nonReviewerPoliciesFailed: true,
     });
 
-    expect(status.kind).toBe("policiesFailed");
+    expect(status.kind).toBe("draft");
+  });
+
+  it("still reports merge conflicts on a draft, which do not resolve themselves", () => {
+    const status = evaluatePullRequestStatus({
+      ...base,
+      isDraft: true,
+      hasFailures: true,
+      nonReviewerPoliciesFailed: true,
+    });
+
+    expect(status.kind).toBe("failed");
   });
 
   it("reports pending non-reviewer policies", () => {
