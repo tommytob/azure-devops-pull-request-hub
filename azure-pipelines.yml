@@ -1,22 +1,13 @@
-# Verifies every pull request into main, and publishes the extension when a v*
-# tag is pushed - so a release is `git tag v2.7.1 && git push --tags`.
+# Continuous integration: typecheck, test and build.
 #
-# Needs three pipeline variables (Pipelines > Edit > Variables):
-#   PUBLISHER_ID     the Marketplace publisher, e.g. Transheroes
-#   SHARE_WITH       the Azure DevOps organisation to share the extension with
-#   MARKETPLACE_PAT  secret - a PAT with Marketplace (Manage) over all organisations
-#
-# Publishing goes through tfx-cli rather than the Azure DevOps Extension Tasks
-# marketplace extension. It is the same command that works locally, so there is
-# one fewer moving part and nothing extra to install in the organisation.
+# Runs on every pull request into main and on every merge. Deliberately holds no
+# secrets - publishing lives in azure-pipelines-release.yml, so the Marketplace
+# token is never available to a build triggered by a pull request.
 
 trigger:
   branches:
     include:
       - main
-  tags:
-    include:
-      - v*
 
 pr:
   branches:
@@ -28,80 +19,26 @@ pool:
 
 variables:
   nodeVersion: 20.x
-  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
 
-stages:
-  - stage: verify
-    displayName: Typecheck, test and build
-    jobs:
-      - job: verify
-        displayName: Verify
-        steps:
-          - task: NodeTool@0
-            displayName: Use Node $(nodeVersion)
-            inputs:
-              versionSpec: $(nodeVersion)
+steps:
+  - task: NodeTool@0
+    displayName: Use Node $(nodeVersion)
+    inputs:
+      versionSpec: $(nodeVersion)
 
-          - script: npm ci
-            displayName: Install
+  - script: npm ci
+    displayName: Install
 
-          - script: npx tsc --noEmit
-            displayName: Typecheck
+  - script: npx tsc --noEmit
+    displayName: Typecheck
 
-          # --watchAll=false because react-scripts otherwise waits for changes.
-          - script: npm test -- --watchAll=false
-            displayName: Test
-            env:
-              CI: true
+  # --watchAll=false because react-scripts otherwise waits for changes.
+  - script: npm test -- --watchAll=false
+    displayName: Test
+    env:
+      CI: true
 
-          - script: npm run build
-            displayName: Build
-            env:
-              CI: true
-
-  - stage: release
-    displayName: Package and publish
-    dependsOn: verify
-    condition: and(succeeded(), eq(variables.isRelease, true))
-    jobs:
-      - job: release
-        displayName: Release
-        steps:
-          - task: NodeTool@0
-            displayName: Use Node $(nodeVersion)
-            inputs:
-              versionSpec: $(nodeVersion)
-
-          # The tag carries the version: v2.7.1 becomes 2.7.1. Written after
-          # checkout, which the agent does before the first step.
-          - script: |
-              set -e
-              VERSION="${BUILD_SOURCEBRANCHNAME#v}"
-              printf '{"version": "%s"}\n' "$VERSION" > vss-extension.version.json
-              echo "Releasing $VERSION"
-            displayName: Stamp the extension version
-
-          - script: npm ci
-            displayName: Install
-
-          - script: npm run build
-            displayName: Build
-            env:
-              CI: true
-
-          # tfx-cli is a devDependency, so npm run puts it on PATH.
-          - script: npm run package-release
-            displayName: Package
-
-          - script: >
-              npx --yes tfx-cli extension publish --json
-              --publisher "$(PUBLISHER_ID)"
-              --service-url https://marketplace.visualstudio.com/
-              --vsix azure-devops-pull-request-manager-hub.vsix
-              --share-with "$(SHARE_WITH)"
-              --auth-type pat --token "$(MARKETPLACE_PAT)"
-            displayName: Publish to the Marketplace
-
-          - publish: azure-devops-pull-request-manager-hub.vsix
-            artifact: vsix
-            displayName: Keep the package as an artifact
+  - script: npm run build
+    displayName: Build
+    env:
+      CI: true
