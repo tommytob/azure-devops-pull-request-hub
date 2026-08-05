@@ -1,25 +1,48 @@
 # Publishes the extension to the Marketplace and tags the release.
 #
-# The version file is the trigger: bump vss-extension.version.json in a pull
-# request, and merging it releases. No tag to remember, and no way to forget one.
+# Sits behind the build pipeline: this one starts once CI has succeeded on main,
+# and then waits. Nothing is published until someone starts the stage by hand, so
+# a merge never releases by itself.
+#
+# The version comes from vss-extension.version.json, and the tag it pushes is the
+# record that a version went out - so starting the stage on an already released
+# version publishes nothing. Handy for a test run: start it by hand with the
+# version parameter set to something disposable.
 #
 # Needs three pipeline variables (Pipelines > Edit > Variables):
 #   PUBLISHER_ID     the Marketplace publisher, e.g. Transheroes
 #   SHARE_WITH       the Azure DevOps organisation to share the extension with
 #   MARKETPLACE_PAT  secret - a PAT with Marketplace (Manage) over all organisations
 #
-# And, for the tag it pushes back: give "Transportal Build Service" the
-# Contribute permission on this repository (Repository settings > Security).
-# Without it every step still runs and publishes; only the final tag push fails.
+# The token lives here and not in the CI pipeline on purpose: a build that runs on
+# every pull request should not have access to it.
+#
+# And for the tag it pushes back: give "Transportal Build Service" the Contribute
+# permission on this repository (Repository settings > Security). Without it
+# everything still publishes and only the final tag step fails.
 
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    include:
-      - vss-extension.version.json
+parameters:
+  - name: version
+    displayName: "Version to publish (blank: take it from vss-extension.version.json)"
+    type: string
+    default: ""
+  - name: forcePublish
+    displayName: Publish even if this version is already tagged
+    type: boolean
+    default: false
 
+# The `source` must match the name you give the CI pipeline when you create it in
+# Azure DevOps. If it does not match, this pipeline simply never triggers.
+resources:
+  pipelines:
+    - pipeline: ci
+      source: azure-devops-pull-request-hub CI
+      trigger:
+        branches:
+          include:
+            - main
+
+trigger: none
 pr: none
 
 pool:
@@ -28,81 +51,100 @@ pool:
 variables:
   nodeVersion: 20.x
 
-steps:
-  # persistCredentials so the tag can be pushed back; fetchTags so the check
-  # below sees tags that already exist.
-  - checkout: self
-    persistCredentials: true
-    fetchTags: true
-
-  - task: NodeTool@0
-    displayName: Use Node $(nodeVersion)
-    inputs:
-      versionSpec: $(nodeVersion)
-
-  # The tag is the record that a version was published, which makes this safe to
-  # re-run: a merge that touches the version file without changing the version
-  # publishes nothing.
-  - script: |
-      set -e
-      VERSION=$(node -p "require('./vss-extension.version.json').version")
-      echo "Version file says ${VERSION}"
-
-      if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-        echo "v${VERSION} is already tagged, so it has been published. Nothing to do."
-        echo "##vso[task.setvariable variable=shouldPublish]false"
-      else
-        echo "##vso[task.setvariable variable=shouldPublish]true"
-        echo "##vso[task.setvariable variable=releaseVersion]${VERSION}"
-      fi
-    displayName: Decide whether this version is new
-
-  - script: npm ci
-    displayName: Install
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
-
-  - script: npx tsc --noEmit
-    displayName: Typecheck
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
-
-  # Never publish untested code, even though CI already ran on the pull request.
-  - script: npm test -- --watchAll=false
-    displayName: Test
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
-    env:
-      CI: true
-
-  - script: npm run build
-    displayName: Build
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
-    env:
-      CI: true
-
-  # tfx-cli is a devDependency, so npm run puts it on PATH.
-  - script: npm run package-release
-    displayName: Package
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
-
-  - script: >
-      npx --yes tfx-cli extension publish --json
-      --publisher "$(PUBLISHER_ID)"
-      --service-url https://marketplace.visualstudio.com/
-      --vsix azure-devops-pull-request-manager-hub.vsix
-      --share-with "$(SHARE_WITH)"
-      --auth-type pat --token "$(MARKETPLACE_PAT)"
+stages:
+  - stage: publish
     displayName: Publish to the Marketplace
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+    # The manual gate. The run appears and waits here.
+    trigger: manual
+    jobs:
+      - job: publish
+        displayName: Package and publish
+        steps:
+          # persistCredentials so the tag can be pushed back; fetchTags so the
+          # check below sees tags that already exist.
+          - checkout: self
+            persistCredentials: true
+            fetchTags: true
 
-  - publish: azure-devops-pull-request-manager-hub.vsix
-    artifact: vsix-$(releaseVersion)
-    displayName: Keep the package as an artifact
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+          - task: NodeTool@0
+            displayName: Use Node $(nodeVersion)
+            inputs:
+              versionSpec: $(nodeVersion)
 
-  # Last, so a failed publish leaves no tag claiming the version went out.
-  - script: |
-      set -e
-      git tag "v$(releaseVersion)"
-      git push origin "v$(releaseVersion)"
-      echo "Tagged v$(releaseVersion)"
-    displayName: Tag the release
-    condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+          - script: |
+              set -e
+              VERSION="${{ parameters.version }}"
+
+              if [ -z "${VERSION}" ]; then
+                VERSION=$(node -p "require('./vss-extension.version.json').version")
+                echo "Version file says ${VERSION}"
+              else
+                echo "Version overridden to ${VERSION}"
+                printf '{"version": "%s"}\n' "${VERSION}" > vss-extension.version.json
+              fi
+
+              # Boolean parameters interpolate as True/False here, not true/false.
+              FORCE=$(echo "${{ parameters.forcePublish }}" | tr '[:upper:]' '[:lower:]')
+
+              if [ "${FORCE}" = "true" ]; then
+                echo "Forced, so the tag check is skipped."
+                echo "##vso[task.setvariable variable=shouldPublish]true"
+              elif git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+                echo "v${VERSION} is already tagged, so it has been published. Nothing to do."
+                echo "##vso[task.setvariable variable=shouldPublish]false"
+              else
+                echo "##vso[task.setvariable variable=shouldPublish]true"
+              fi
+
+              echo "##vso[task.setvariable variable=releaseVersion]${VERSION}"
+            displayName: Decide whether this version is new
+
+          - script: npm ci
+            displayName: Install
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+
+          - script: npx tsc --noEmit
+            displayName: Typecheck
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+
+          # Never publish untested code, even though CI already ran on the merge.
+          - script: npm test -- --watchAll=false
+            displayName: Test
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+            env:
+              CI: true
+
+          - script: npm run build
+            displayName: Build
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+            env:
+              CI: true
+
+          # tfx-cli is a devDependency, so npm run puts it on PATH.
+          - script: npm run package-release
+            displayName: Package
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+
+          - script: >
+              npx --yes tfx-cli extension publish --json
+              --publisher "$(PUBLISHER_ID)"
+              --service-url https://marketplace.visualstudio.com/
+              --vsix azure-devops-pull-request-manager-hub.vsix
+              --share-with "$(SHARE_WITH)"
+              --auth-type pat --token "$(MARKETPLACE_PAT)"
+            displayName: Publish to the Marketplace
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+
+          - publish: azure-devops-pull-request-manager-hub.vsix
+            artifact: vsix-$(releaseVersion)
+            displayName: Keep the package as an artifact
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
+
+          # Last, so a failed publish leaves no tag claiming the version went out.
+          - script: |
+              set -e
+              git tag "v$(releaseVersion)"
+              git push origin "v$(releaseVersion)"
+              echo "Tagged v$(releaseVersion)"
+            displayName: Tag the release
+            condition: and(succeeded(), eq(variables.shouldPublish, 'true'))
