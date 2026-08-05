@@ -77,10 +77,6 @@ interface WorkItemsCache {
   workItems: Array<{ id: number; fields: { [field: string]: any } }>;
 }
 
-interface LabelsCache {
-  labels: WebApiTagDefinition[];
-}
-
 interface PoliciesCache {
   policies: PullRequestPolicy[];
   isAllPoliciesOk: boolean;
@@ -271,8 +267,6 @@ export class PullRequestModel {
       );
     }
 
-    callList.push(() => this.getLabels());
-
     return callList;
   }
 
@@ -308,6 +302,10 @@ export class PullRequestModel {
       8
     );
     this.lastCommitUrl = `${this.baseHostUrl}/_git/${this.gitPullRequest.repository.name}/commit/${this.gitPullRequest.lastMergeSourceCommit.commitId}?refName=GB${this.gitPullRequest.sourceRefName}`;
+    // Labels come with the pull request list itself - verified populated at
+    // api-version 5.0, 5.1 and 7.1 - so there is nothing to fetch and nothing
+    // to cache. Absent rather than empty when a pull request has none.
+    this.labels = this.gitPullRequest.labels ?? [];
     this.hasFailures = hasPullRequestFailure(this);
     this.loadLastVisit();
   }
@@ -643,34 +641,6 @@ export class PullRequestModel {
     });
   }
 
-  private async getLabels() {
-    const cached = this.cacheRead<LabelsCache>("labels");
-
-    if (cached !== undefined) {
-      this.labels = cached.labels;
-
-      return;
-    }
-
-    const gitClient: GitRestClient = getClient(GitRestClient);
-    let self = this;
-
-    await gitClient
-      .getPullRequestLabels(
-        self.gitPullRequest.repository.id,
-        this.gitPullRequest.pullRequestId
-      )
-      .then((data) => {
-        self.labels = data;
-        self.cacheWrite<LabelsCache>("labels", { labels: data });
-      })
-      .catch((error) => {
-        console.log(
-          "There was an error calling the builds (method: processPolicyBuildAsync)."
-        );
-        console.log(error);
-      });
-  }
 
   public static getModels(
     pullRequestList: GitPullRequest[] | undefined,

@@ -28,12 +28,7 @@ export const POLICY_BUCKET_LIFETIME_MS = 3 * 60 * 1000;
  * there is no way to persist an empty result from a failed request, which would
  * otherwise look like real data for the next quarter of an hour.
  */
-export type CacheBucket =
-  | "details"
-  | "threads"
-  | "workItems"
-  | "labels"
-  | "policies";
+export type CacheBucket = "details" | "threads" | "workItems" | "policies";
 
 interface CacheEntry<T> {
   version: number;
