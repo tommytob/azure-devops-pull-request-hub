@@ -21,7 +21,8 @@ import {
 import { WebApiTagDefinition } from "azure-devops-extension-api/Core";
 import { USER_SETTINGS_STORE_KEY } from "../common";
 import { getEvaluationsPerPullRequest } from "../services/AzureGitServices";
-import { AzureGitModels, EvaluationPolicyType } from "./GitModels";
+import { EvaluationPolicyType } from "./GitModels";
+import { isCountedPolicy, summarisePolicies } from "./PolicyEvaluation";
 import {
   evaluatePullRequestStatus,
   PullRequestStatusKind,
@@ -581,44 +582,16 @@ export class PullRequestModel {
       this.gitPullRequest.pullRequestId
     );
 
-    const blockingPolicies = policies.filter(
-      (i) =>
-        i.configuration.isEnabled === true && i.configuration.isBlocking === true
-    );
+    const summary = summarisePolicies(policies);
 
-    const isReviewerPolicy = (i: AzureGitModels.Value): boolean =>
-      i.configuration.type.id === EvaluationPolicyType.MinimumReviewers ||
-      i.configuration.type.id === EvaluationPolicyType.RequiredReviewers;
+    self.isAllPoliciesOk = summary.isAllPoliciesOk;
+    self.arePoliciesRejected = summary.arePoliciesRejected;
+    self.areReviewerPoliciesOk = summary.areReviewerPoliciesOk;
 
-    const reviewerPolicies = blockingPolicies.filter(isReviewerPolicy);
-    const otherPolicies = blockingPolicies.filter(
-      (i) => isReviewerPolicy(i) === false
-    );
-
-    // notApplicable counts as satisfied: a policy that does not apply should
-    // not hold a pull request on "waiting" forever.
-    const isSatisfied = (i: AzureGitModels.Value): boolean =>
-      i.status === "approved" || i.status === "notApplicable";
-
-    const hasFailed = (i: AzureGitModels.Value): boolean =>
-      i.status === "rejected" || i.status === "broken";
-
-    self.isAllPoliciesOk = otherPolicies.every(isSatisfied);
-    self.arePoliciesRejected = otherPolicies.some(hasFailed);
-
-    // undefined means "no reviewer policy configured", which is different from
-    // "configured and not satisfied" - the status logic treats them apart.
-    self.areReviewerPoliciesOk =
-      reviewerPolicies.length === 0
-        ? undefined
-        : reviewerPolicies.every(isSatisfied);
-
+    // The same set the summary counts, so the tooltip does not list a policy
+    // that can only ever read as unapproved.
     policies
-      .filter(
-        (p) =>
-          p.configuration.isEnabled === true &&
-          p.configuration.isBlocking === true
-      )
+      .filter(isCountedPolicy)
       .forEach((p) => {
         const pullRequestPolicy = new PullRequestPolicy();
         pullRequestPolicy.id = p.evaluationId;

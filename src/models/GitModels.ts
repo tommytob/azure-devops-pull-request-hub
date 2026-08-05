@@ -6,6 +6,11 @@ export enum EvaluationPolicyType {
   Build = "0609b952-1397-4640-95ec-e00a01b2c241",
   RequiredReviewers = "fd2167ab-b0be-447a-8ec8-39368250530e",
   CommentRequirements = "c6a1889d-b943-4856-b76f-9e46bb6b0df2",
+  /**
+   * Note how close this is to MinimumReviewers - 4916/171ab against 4906/171dd.
+   * Four characters apart, and they mean entirely different things.
+   */
+  MergeStrategy = "fa4e907d-c16b-4a4c-9dfa-4916e5d171ab",
 }
 
 export declare module AzureGitModels {

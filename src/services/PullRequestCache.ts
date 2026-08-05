@@ -17,7 +17,7 @@
 const CACHE_KEY_PREFIX = "prmh_pr_cache_";
 
 /** Bump when the cached shape changes, so old entries are ignored rather than misread. */
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 export const SLOW_BUCKET_LIFETIME_MS = 15 * 60 * 1000;
 export const POLICY_BUCKET_LIFETIME_MS = 3 * 60 * 1000;
